@@ -146,18 +146,25 @@ jobs:
     name: "Stage 4: Remote Linux Server Deployment (SSH)"
     needs: docker-build-publish
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      secrets.DEPLOY_HOST != '' &&
-      secrets.DEPLOY_USER != '' &&
-      secrets.DEPLOY_SSH_KEY != ''
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout Deployment Manifests
         uses: actions/checkout@v4
 
+      - name: Validate Remote Deployment Secrets
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.DEPLOY_HOST }}" ] || [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
+            echo "::notice ::Remote deployment secrets (DEPLOY_HOST, DEPLOY_SSH_KEY) are not configured. Skipping remote SSH execution."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Remote deployment secrets verified. Proceeding with SSH deployment."
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Execute Remote SSH Deployment
+        if: steps.check-secrets.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
