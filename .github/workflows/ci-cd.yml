@@ -9,29 +9,28 @@ on:
       - main
   workflow_dispatch:
 
-# Permissions required to publish packages to GitHub Container Registry (GHCR)
 permissions:
   contents: read
   packages: write
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE_NAME: ${{ github.repository }}/kisaniq-backend
-  FRONTEND_IMAGE_NAME: ${{ github.repository }}/kisaniq-frontend
+  BACKEND_IMAGE: ghcr.io/shiven-rajput-007/kisaniq-backend
+  FRONTEND_IMAGE: ghcr.io/shiven-rajput-007/kisaniq-frontend
 
 jobs:
   # ============================================================================
-  # STAGE 1 & 2: SOURCE CODE CHECKOUT, DEPENDENCY INSTALLATION, BUILD & TESTS
+  # STAGE 1 & 2: SOURCE CODE CHECKOUT, BUILD & AUTOMATED TESTS
   # ============================================================================
   build-and-test:
-    name: "Stage 1 & 2: Build & Test (Source, TypeScript, React)"
+    name: "Stage 1 & 2: Build & Test"
     runs-on: ubuntu-latest
 
     steps:
-      - name: Stage 1: Checkout Repository Source
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Runtime (v20)
+      - name: Set up Node.js Runtime (v20)
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -48,7 +47,7 @@ jobs:
         working-directory: server
         run: npm run build
 
-      - name: Run Backend Automated Test Suite (Mandi Decision & Routing)
+      - name: Run Backend Automated Test Suite
         working-directory: server
         run: npm run test:mandi
 
@@ -56,7 +55,7 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Run Frontend i18n Key Parity Test Suite (EN, HI, MR)
+      - name: Run Frontend i18n Key Parity Tests
         working-directory: frontend
         run: npm run test:i18n
 
@@ -65,20 +64,20 @@ jobs:
         run: npm run build
 
   # ============================================================================
-  # STAGE 3: DOCKER BUILD, CONFIG VALIDATION & GHCR IMAGE PUBLISHING
+  # STAGE 3: DOCKER BUILD, CONFIG VALIDATION & GHCR PUBLISH
   # ============================================================================
   docker-build-publish:
-    name: "Stage 3: Docker Build, Validation & GHCR Publish"
+    name: "Stage 3: Docker Build & Publish"
     needs: build-and-test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository Source
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
       - name: Validate Docker Compose Configuration
         run: |
-          echo "Validating compose.yaml syntax and configuration..."
+          echo "Validating compose.yaml syntax..."
           docker compose config
 
       - name: Set up Docker Buildx
@@ -88,21 +87,19 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata (tags, labels) for Backend
       - name: Extract Docker metadata for Backend
         id: meta-backend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+          images: ${{ env.BACKEND_IMAGE }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=short,prefix=sha-
 
-      # Build and push Backend Image
       - name: Build and Push Backend Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -114,17 +111,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Extract metadata (tags, labels) for Frontend
       - name: Extract Docker metadata for Frontend
         id: meta-frontend
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
+          images: ${{ env.FRONTEND_IMAGE }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=short,prefix=sha-
 
-      # Build and push Frontend Image
       - name: Build and Push Frontend Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -143,61 +138,64 @@ jobs:
   # STAGE 4: CONDITIONAL REMOTE SERVER DEPLOYMENT VIA SSH
   # ============================================================================
   deploy:
-    name: "Stage 4: Remote Linux Server Deployment (SSH)"
+    name: "Stage 4: Remote Linux Deployment (SSH)"
     needs: docker-build-publish
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - name: Checkout Deployment Manifests
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Validate Remote Deployment Secrets
+      - name: Verify Remote Deployment Credentials
         id: check-secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          if [ -z "${{ secrets.DEPLOY_HOST }}" ] || [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
-            echo "::notice ::Remote deployment secrets (DEPLOY_HOST, DEPLOY_SSH_KEY) are not configured. Skipping remote SSH execution."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "Remote deployment credentials (DEPLOY_HOST, DEPLOY_SSH_KEY) are not set."
+            echo "Skipping remote SSH deployment step cleanly."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Remote deployment secrets verified. Proceeding with SSH deployment."
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Remote deployment credentials verified."
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Execute Remote SSH Deployment
-        if: steps.check-secrets.outputs.configured == 'true'
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
+        if: steps.check-secrets.outputs.ready == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          TARGET_DIR="${DEPLOY_PATH:-~/kisaniq-production}"
+          echo "Connecting to $DEPLOY_USER@$DEPLOY_HOST..."
+
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa "$DEPLOY_USER@$DEPLOY_HOST" "
             set -e
-            DEPLOY_DIR="${{ secrets.DEPLOY_PATH }}"
-            if [ -z "$DEPLOY_DIR" ]; then
-              DEPLOY_DIR="~/kisaniq-production"
+            mkdir -p '$TARGET_DIR'
+            cd '$TARGET_DIR'
+
+            if [ -n '$GHCR_TOKEN' ] && [ -n '$GHCR_USERNAME' ]; then
+              echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin
             fi
 
-            echo "🚀 Starting remote deployment in $DEPLOY_DIR..."
-            mkdir -p "$DEPLOY_DIR"
-            cd "$DEPLOY_DIR"
-
-            # Optional GHCR Authentication for private images
-            if [ -n "${{ secrets.GHCR_TOKEN }}" ] && [ -n "${{ secrets.GHCR_USERNAME }}" ]; then
-              echo "Authenticating with GitHub Container Registry..."
-              echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
-            fi
-
-            # Pull latest compose configuration if git exists or copy files
-            echo "Pulling latest Docker images..."
+            echo 'Pulling latest KisanIQ containers...'
             docker compose pull || true
 
-            echo "Recreating and restarting multi-container stack..."
+            echo 'Restarting multi-container stack...'
             docker compose up -d --remove-orphans
 
-            echo "Verifying running container status..."
+            echo 'Verifying running containers...'
             docker compose ps
-
-            echo "Checking container health..."
-            sleep 10
-            docker compose ps
-            echo "✅ Deployment completed successfully!"
+          "
+          echo "Deployment finished successfully!"
