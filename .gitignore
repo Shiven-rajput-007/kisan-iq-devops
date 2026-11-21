@@ -1,52 +1,76 @@
-# Environment files
+# ==============================================================================
+# Git Ignore Configuration for KisanIQ DevOps Repository
+# ==============================================================================
+
+# Private & Sensitive Environment Files (NEVER COMMIT CREDENTIALS)
 .env
 .env.local
 .env.*.local
+*.env
 server/.env
 frontend/.env
+!.env.example
+!server/.env.example
+!frontend/.env.example
 
-# Dependencies
+# Node Dependencies
 node_modules/
+server/node_modules/
+frontend/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# Build outputs
+# Production Build Outputs
 dist/
 dist-ssr/
 build/
+server/dist/
+frontend/dist/
 *.tsbuildinfo
 
-# Database data and locks
+# Database Data Directories, Locks & Local Storage
 server/db/data/
 **/db/data/**
 **/server/server/**
 *.sqlite
 *.sqlite-journal
+*.db
 
-# Logs
+# Logs & Runtime Diagnostics
 logs/
 *.log
 
-# OS / Editor files
+# OS & IDE Configuration
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# Ignore unrelated files & documents in root
-medical-diagnosis-assistant/
-data/
-figures/
-preview_pages/
-__pycache__/
+# Large Archives & Generated Document Reports
+*.zip
 *.docx
 *.pdf
 *.xlsx
-*.zip
 *.html
 *.tex
-*.db
+*.bak
+
+# Unrelated Academic Paper Scripts & Workspace Utilities
+medical-diagnosis-assistant/
+html-form-jenkins/
+KisanIQ-project/
+report_assets/
+report_generator/
+HTML_Form_GitHub_Jenkins_Practical_Report.*
+IEEE_UPI_Fraud_Awareness_Review_Paper.*
+Medical_Diagnosis_Assistant_Project_Report/
+figures/
+preview_pages/
+data/
+__pycache__/
+*.pyc
 build_*.py
 generate_*.py
 run_automated_audit.py
@@ -54,7 +78,5 @@ test_*.py
 test_*.docx
 test.pdf
 chrome_test.pdf
-CHATGPT_PROJECT_CONTEXT.md
-IEEE_UPI_Fraud_Awareness_Review_Paper.*
 docx_helpers.py
-
+CHATGPT_PROJECT_CONTEXT.md

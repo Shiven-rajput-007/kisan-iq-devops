@@ -846,6 +846,11 @@ async function runMandiTestSuite() {
     source: 'AGMARKNET / data.gov.in' as const,
   };
 
+  await db.query(`DELETE FROM market_prices WHERE commodity = $1 AND market_name = $2 AND arrival_date = $3`, [
+    testNormRec.commodity,
+    testNormRec.marketName,
+    testNormRec.arrivalDate,
+  ]);
   const ing1 = await mandiService.ingestNormalizedRecords([testNormRec]);
   const ing2 = await mandiService.ingestNormalizedRecords([testNormRec]);
 

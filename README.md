@@ -1,211 +1,233 @@
-# KisanIQ — Intelligent Digital Farming Assistant (Production Full-Stack)
+# KisanIQ — Intelligent Digital Farming Assistant (Full-Stack & DevOps Enabled)
 
 > **“KisanIQ does not just show farming data. KisanIQ converts farming data into clear decisions and actions.”**  
 > Core flow: **DATA → INTELLIGENCE → DECISION → ACTION**  
 > Primary farmer question: **“Aaj mujhe kya karna hai?” / “आज मला काय करायचे आहे?”**
 
----
-
-## 🏗️ Production Full-Stack Architecture
-
-```
-React 18 + Vite + Tailwind Frontend (Port 5173)
-        │
-        │ HTTP REST APIs (JSON / JWT / Marathi-First i18n)
-        ▼
-Node.js + Express + TypeScript Backend (Port 8000)
-        │
-   ┌────┴────────────────────────┬────────────────────────┬────────────────────────┐
-   ▼                             ▼                        ▼                        ▼
-PostgreSQL Database        Open-Meteo API           Explainable Decision     CEDA Agmarknet API
-(Embedded PGlite or       (Live agricultural       Engine (Rules + FAO-56   (Official Mandi
-External PostgreSQL)       weather & forecast)      + Mandi Optimization)    Prices & Quantities)
-```
+[![KisanIQ CI/CD Pipeline](https://github.com/Shiven-rajput-007/kisan-iq-devops/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Shiven-rajput-007/kisan-iq-devops/actions/workflows/ci-cd.yml)
+[![Docker](https://img.shields.io/badge/Docker-Multi--Container-blue?logo=docker)](compose.yaml)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%2016-336791?logo=postgresql)](compose.yaml)
+[![React](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite-61DAFB?logo=react)](frontend/)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933?logo=node.js)](server/)
 
 ---
 
-## 📋 10-Step Setup & Run Instructions
+## 📚 B.Tech DevOps Practical Submission Documentation
 
-Follow these exact steps to run the complete KisanIQ application locally:
+This repository implements practical engineering assignments for **DevOps Laboratory**:
+- **Assignment 14**: Docker Compose for a Multi-Container Application (Web + Database + Reverse Proxy).
+- **Assignment 15**: Simple CI/CD Pipeline integrating GitHub, build tools, Docker, and remote deployment.
 
-### 1. Install Node.js
-Ensure Node.js (v18.0.0 or higher) and npm are installed on your system:
+For complete academic lab submission notes, viva-voce answers, and architectural explanations, refer to:
+👉 **[DEVOPS-ASSIGNMENT.md](DEVOPS-ASSIGNMENT.md)**
+
+---
+
+## 🏗️ Production System Architecture
+
+```
+                                 [ Browser / Mobile Client ]
+                                              │
+                                       HTTP Port 5173 / 80
+                                              ▼
+                    ┌──────────────────────────────────────────────────┐
+                    │    Frontend Container (kisaniq-frontend)         │
+                    │    • Nginx Alpine Web Server                     │
+                    │    • React 19 + Vite + Tailwind CSS SPA          │
+                    │    • Reverse Proxy (/api/* -> backend:8000)      │
+                    └─────────────────────────┬────────────────────────┘
+                                              │ Internal Docker Network
+                                              │ (kisaniq-network)
+                                              ▼
+                    ┌──────────────────────────────────────────────────┐
+                    │    Backend Container (kisaniq-backend)           │
+                    │    • Node.js 20 + Express + TypeScript           │
+                    │    • RESTful APIs & Auth Middleware (JWT)        │
+                    │    • Explainable Agronomic Decision Engine       │
+                    └───────────┬───────────────────────────┬──────────┘
+                                │                           │
+                 TCP Port 5432  ▼                           ▼ External APIs
+┌──────────────────────────────────────────────┐   ┌───────────────────────────────┐
+│ Database Container (kisaniq-db)              │   │ • Open-Meteo Weather API      │
+│ • PostgreSQL 16 Alpine Engine                │   │ • CEDA Agmarknet Mandi API    │
+│ • 25 Relational Schema Tables                │   │ • Soil Health Card Directory  │
+│ • Persistent Volume (kisaniq_pgdata)         │   └───────────────────────────────┘
+└──────────────────────────────────────────────┘
+```
+
+---
+
+## 🐳 Assignment 14: Docker Compose Implementation
+
+KisanIQ is fully containerized as a three-tier micro-architecture orchestrated via [`compose.yaml`](compose.yaml) (and legacy-compatible [`docker-compose.yml`](docker-compose.yml)).
+
+### 1. Services Specification
+
+| Service | Container Name | Image / Build Base | Host Port | Role |
+|---|---|---|---|---|
+| `frontend` | `kisaniq-frontend` | `node:20-alpine` $\to$ `nginx:alpine` | `5173:80`, `80:80` | Serves compiled React assets, handles SPA client routing, and reverse-proxies `/api/` traffic to the backend. |
+| `backend` | `kisaniq-backend` | `node:20-alpine` (Multi-stage) | `8000:8000` | Executes Express TypeScript API, manages database migrations, runs decision logic. |
+| `db` | `kisaniq-db` | `postgres:16-alpine` | `5432:5432` | Stores all persistent relational records (users, crops, soil tests, mandis, orders). |
+
+### 2. Multi-Container Orchestration Features
+
+- **Isolated Docker Bridge Network (`kisaniq-network`)**: Services communicate internally over secure DNS names (`db`, `backend`, `frontend`).
+- **Data Persistence (`kisaniq_pgdata`)**: PostgreSQL data is mapped to a dedicated Docker volume so database records persist across reboots.
+- **Automated Health Checks**:
+  - `db`: Monitored with `pg_isready -U kisaniq_user -d kisaniq_db`.
+  - `backend`: Monitored with `wget http://127.0.0.1:8000/api/health` (actively performs `SELECT 1` on PostgreSQL).
+  - `frontend`: Monitored with `wget http://127.0.0.1:80/`.
+- **Dependency Chaining (`depends_on: condition: service_healthy`)**:
+  - `backend` waits until PostgreSQL is verified healthy.
+  - `frontend` waits until backend API server is verified healthy.
+- **Zero-Hardcoded Secrets**: Uses environment variable interpolation with safe defaults (`.env.example`).
+
+---
+
+## 🚀 Quick Start: Running with Docker Compose
+
+Ensure Docker and Docker Compose are installed:
+
 ```bash
-node -v
-npm -v
+# 1. Clone repository
+git clone https://github.com/Shiven-rajput-007/kisan-iq-devops.git
+cd kisan-iq-devops
+
+# 2. Configure Environment (optional, defaults provided)
+cp .env.example .env
+
+# 3. Validate Docker Compose Configuration
+docker compose config
+
+# 4. Build and Start the Entire Multi-Container Application
+docker compose up -d --build
+
+# 5. Check Container Status and Health
+docker compose ps
 ```
 
-### 2. Install PostgreSQL (Optional)
-KisanIQ supports two PostgreSQL database modes:
-- **Default (Zero Setup)**: Uses embedded real PostgreSQL (`@electric-sql/pglite`) persisting data locally to `./server/db/data`. No external database, Docker, or PostgreSQL service installation is required.
-- **External PostgreSQL**: If you prefer connecting to your own PostgreSQL server (local, Supabase, Neon, RDS), ensure your PostgreSQL service is running and create a database.
+Access the running application:
+- **Frontend Web UI**: [http://localhost:5173/](http://localhost:5173/) or [http://localhost:80/](http://localhost:80/)
+- **Backend Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+- **Database**: PostgreSQL on `localhost:5432` (`user: kisaniq_user`, `database: kisaniq_db`)
 
-### 3. Create Database (If using external PostgreSQL)
-```sql
-CREATE DATABASE kisaniq_db;
-```
+### Container Management Commands
 
-### 4. Configure Environment Variables
-Copy `.env.example` to `server/.env` and adjust if necessary:
 ```bash
-cp .env.example server/.env
-```
-Default settings:
-```ini
-PORT=8000
-DATABASE_URL=
-JWT_SECRET_KEY=kisaniq-super-secret-production-key-2026
-FRONTEND_URL=http://localhost:5173
-VITE_API_URL=http://localhost:8000/api
-CEDA_API_KEY=
-CEDA_BASE_URL=https://api.ceda.ashoka.edu.in/v1
-OPEN_METEO_BASE_URL=https://api.open-meteo.com
-```
-*(Leave `DATABASE_URL` blank to use the embedded PostgreSQL database automatically; configure `CEDA_API_KEY` for live CEDA Agmarknet price synchronization).*
+# View live application logs
+docker compose logs -f
 
-### 5. Install Dependencies
-Install dependencies for both backend and frontend from the root workspace:
+# View logs for a specific service
+docker compose logs -f backend
+docker compose logs -f db
+
+# Restart a service
+docker compose restart backend
+
+# Stop all containers (preserving persistent database volume)
+docker compose down
+
+# Stop all containers and remove database volume (full reset)
+docker compose down -v
+```
+
+---
+
+## 🔄 Assignment 15: CI/CD Pipeline (GitHub Actions)
+
+The automated Continuous Integration & Continuous Deployment pipeline is configured in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml).
+
+### Pipeline Stages
+
+```mermaid
+flowchart LR
+    S1["Stage 1: Source<br/>(Git Checkout)"] --> S2["Stage 2: Build & Test<br/>(tsc, Vite, npm test)"]
+    S2 --> S3["Stage 3: Docker & GHCR<br/>(Buildx, Tag, Publish)"]
+    S3 --> S4["Stage 4: Deployment<br/>(SSH to Remote Host)"]
+```
+
+1. **Stage 1: Source**
+   - Triggers on `push` to `main`, `pull_request` to `main`, and manual dispatch (`workflow_dispatch`).
+   - Checks out complete source repository using `actions/checkout@v4`.
+
+2. **Stage 2: Build & Test**
+   - Sets up Node.js 20 with dependency caching.
+   - Installs backend packages (`npm ci`) and compiles TypeScript (`npm run build`).
+   - Runs backend test suite (`npm run test:mandi`, 30 unit & regression tests).
+   - Installs frontend packages (`npm ci`) and runs translation parity test (`npm run test:i18n`).
+   - Compiles production React Vite bundle (`npm run build`).
+
+3. **Stage 3: Docker & GHCR Publishing**
+   - Validates `compose.yaml` using `docker compose config`.
+   - Sets up Docker Buildx for optimized multi-stage caching.
+   - Authenticates against GitHub Container Registry (`ghcr.io`) using `GITHUB_TOKEN`.
+   - Builds and tags Docker images with `latest` and commit SHA (`sha-<short_hash>`).
+   - Publishes images to:
+     - `ghcr.io/<owner>/kisaniq-backend`
+     - `ghcr.io/<owner>/kisaniq-frontend`
+
+4. **Stage 4: Automated Remote Deployment (SSH)**
+   - Connects to remote Linux host via SSH (`appleboy/ssh-action@v1.2.0`).
+   - Conditionally executes only when deployment secrets are configured.
+   - Pulls updated container images from GHCR.
+   - Runs `docker compose up -d --remove-orphans`.
+   - Validates running container health.
+
+### Deployment Secrets Configuration
+
+To enable Stage 4 deployment, configure the following secrets in **GitHub Repository $\to$ Settings $\to$ Secrets and variables $\to$ Actions**:
+
+| Secret | Description | Example |
+|---|---|---|
+| `DEPLOY_HOST` | Remote server IP address or domain | `192.0.2.1` |
+| `DEPLOY_USER` | Remote SSH user account | `ubuntu` |
+| `DEPLOY_SSH_KEY` | SSH Private Key authorized on server | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `DEPLOY_PATH` | Target directory on remote server | `/home/ubuntu/kisaniq-deployment` |
+| `GHCR_USERNAME` | GitHub username | `shiven-rajput-007` |
+| `GHCR_TOKEN` | GitHub Personal Access Token (PAT) with `read:packages` | `ghp_...` |
+
+---
+
+## 💻 Local Development (Without Docker)
+
+If developing locally without Docker:
+
 ```bash
-# In server
+# 1. Install dependencies
 cd server && npm install
-
-# In frontend
 cd ../frontend && npm install
-
-# Back to root
 cd ..
-```
 
-### 6. Run Database Migrations / Schema Setup
-Initialize the database tables:
-- **Direct SQL**: Handled automatically on backend startup via `server/db/schema.sql` (25 relational tables).
-- **Prisma**: The complete schema is defined in `prisma/schema.prisma`:
-```bash
-npx prisma generate
-```
-
-### 7. Seed the Database
-Populate verified seed data (farmer accounts, APMC mandis, accredited laboratories, soil reports, vehicles, and crop stages):
-```bash
-# From root
-npm run db:seed
-
-# Or via Prisma
-npx tsx prisma/seed.ts
-```
-
-### 8. Start Backend Server
-```bash
-# From root
-npm run server
-# (Runs on http://localhost:8000)
-```
-
-### 9. Start Frontend Server
-```bash
-# From root (in another terminal)
-npm run dev:frontend
-# (Runs on http://localhost:5173)
-```
-
-**Convenient Single-Command Start:**
-To launch both backend and frontend simultaneously:
-```bash
+# 2. Run backend and frontend concurrently
 npm run dev:full
+
+# 3. Run automated tests
+npm test
 ```
 
-### 10. Open in Browser
-Visit **[http://localhost:5173/](http://localhost:5173/)** to access the complete KisanIQ application.  
-Health check endpoint: **[http://localhost:8000/api/health](http://localhost:8000/api/health)**
-
 ---
 
-## 🚀 Working Development Commands Reference
+## 🗄️ Database Architecture (25 Tables)
 
-| Command | Action |
-|---|---|
-| `npm run dev:full` | Start both Backend and Frontend concurrently |
-| `npm run dev` | Start both services |
-| `npm run server` | Start Express TypeScript backend (`http://localhost:8000`) |
-| `npm run dev:frontend` | Start React Vite frontend (`http://localhost:5173`) |
-| `npm run db:seed` | Seed PostgreSQL database with development records |
-| `npm run build` | Build production bundles for both backend and frontend |
-| `npm run test` | Run the automated 14-point API integration test suite |
-
----
-
-## 🗄️ Database Architecture & Entities
-
-The database schema is defined in both [`server/db/schema.sql`](server/db/schema.sql) and [`prisma/schema.prisma`](prisma/schema.prisma) covering 25 relational models:
-
-1. **`users`**: Authentication credentials, phone numbers, bcrypt password hashes, and user roles (`farmer` / `buyer` / `admin`).
-2. **`farmers`**: Farm profiles, GPS coordinates, location hierarchy (village, district, state), and language preferences.
-3. **`farms` & `fields`**: Land holdings, soil classifications (alluvial, black, red, loamy), and irrigation sources.
-4. **`crops`, `crop_stages` & `crop_actions`**: Crop growth stage timelines, health status, and action checklists.
-5. **`markets` & `market_prices`**: Real APMC mandi directory, geodesic Haversine distance, and daily commodity prices.
-6. **`selling_decisions`**: Multi-factor decision engine calculations, net realizations, and partial selling splits.
-7. **`recommendations` & `alerts`**: Contextual, explainable daily agronomic actions with "Kyun?" (Why?) data points.
-8. **`notifications`**: Real-time alerts for weather risks, mandi price changes, and crop inspection milestones.
-9. **`chat_messages`**: Conversational history with assistant messages persisted in PostgreSQL.
-10. **`orders`, `shipments` & `vehicles`**: Farm-gate direct logistics, vehicle assignment, and shipment tracking codes (`TRK-...`).
-11. **`buyer_profiles`, `crop_listings` & `marketplace_orders`**: Direct farmer-to-buyer marketplace with zero middleman commissions.
-12. **`laboratories`**: Directory of certified NABL / ICAR agricultural soil testing centers.
-13. **`soil_test_requests`**: 7-stage sample tracking lifecycle (`REQUESTED` $\to$ `COMPLETED`).
-14. **`soil_reports`**: NABL lab test results (pH, EC, OC, N, P, K) with crop-calibrated deficiency rules.
-15. **`soil_sensor_readings`**: IoT telemetry readings explicitly tagged as **`DEMO SENSOR DATA`**.
-
----
-
-## 📡 Core API Endpoints
-
-### Health & Dashboard
-- `GET /api/health` — Returns `{ success: true, message: "KisanIQ backend is running", databaseConnected: true }`
-- `GET /api/dashboard` — Aggregated daily briefing for "Aaj Kya Karein" / "आज काय करायचे"
-
-### Authentication & Profiles
-- `POST /api/auth/register` — Farmer and buyer registration with password hashing
-- `POST /api/auth/login` — Phone + password authentication returning JWT bearer token
-- `GET /api/auth/me` — Authenticated session verification
-- `GET /api/farmer/profile` — Farmer profile, farm dimensions, soil, and irrigation
-- `PUT /api/farmer/profile` — Update farmer details
-
-### Weather & Agronomic Intelligence
-- `GET /api/weather/current` — Live Open-Meteo weather with agricultural implications
-- `GET /api/crops` — Farmer crops, stage timeline, and pending action items
-- `POST /api/crops` — Add new crop to field
-- `GET /api/recommendations/daily` — Explainable actions with "Kyun?" reasoning data points
-- `POST /api/recommendations/:id/complete` — Mark action completed in database
-- `GET /api/risk/assessment` — Multi-factor farm risk index (0–100)
-
-### Mandi Intelligence (CEDA Agmarknet API) & Direct Marketplace
-- **Provider**: **CEDA Agmarknet API** ([https://api.ceda.ashoka.edu.in/documentation/](https://api.ceda.ashoka.edu.in/documentation/)) — Programmatically serves verified Agmarknet commodities, geographies, markets, prices, and quantities. *(Note: This is an Agmarknet data API, NOT an e-NAM API).*
-- `GET /api/market/prices` — Real CEDA Agmarknet market prices with state, district, market, and commodity filtering
-- `GET /api/market/mandis` — Directory of APMC mandis
-- `GET /api/market/comparison` — Geodesic APMC mandi comparisons, freight costs, and net returns
-- `GET /api/market/decision` — Transparent net return calculation breakdown
-- `GET /api/market/sync-status` — Ingestion observability, staleness flags, and sync logs
-- `POST /api/market/sync` — Protected trigger for automated daily CEDA Agmarknet bulletin sync
-- `POST /api/market/orders` — Book transport and create farm-gate logistics order
-- `GET /api/marketplace/listings` — Browse verified crop listings
-- `POST /api/marketplace/listings` — Publish direct crop listing
-- `POST /api/marketplace/orders` — Place order directly with farmer
-
-### Soil Testing & Laboratory Workflow
-- `GET /api/soil/labs` — Directory of accredited agricultural testing laboratories
-- `GET /api/soil/requests` — Farmer soil test requests with active status
-- `POST /api/soil/requests` — Submit soil test request (Accredited Lab, Field Kit, IoT)
-- `PUT /api/soil/requests/:id/status` — Advance sample lifecycle stage
-- `GET /api/soil/reports/latest/:farmerId` — Latest verified lab report with agronomic interpretation
-- `GET /api/soil/reports/history/:farmerId` — Historical test reports
-- `GET /api/soil/sensors/latest/:fieldId` — IoT sensor reading with `DEMO SENSOR DATA` tag
-
-### Voice & Text Assistant
-- `POST /api/assistant/chat` — Context-aware NLU assistant supporting Marathi, Hindi, and English
-- `GET /api/assistant/history` — Chat interaction history
+The database schema is defined in [`server/db/schema.sql`](server/db/schema.sql) and [`prisma/schema.prisma`](prisma/schema.prisma):
+- **Core Entities**: `users`, `farmers`, `farms`, `fields`.
+- **Agronomics**: `crops`, `crop_stages`, `crop_actions`, `recommendations`, `alerts`.
+- **Mandi Intelligence**: `markets`, `market_prices`, `selling_decisions`, `mandi_sync_logs`.
+- **Direct Marketplace**: `buyer_profiles`, `crop_listings`, `marketplace_orders`, `orders`, `shipments`, `vehicles`.
+- **Soil & Lab Testing**: `laboratories`, `soil_test_requests`, `soil_reports`, `soil_sensor_readings`.
 
 ---
 
 ## 🌐 Marathi-First Experience (`mr` / `mr-IN`)
-- **Default Application Language**: Marathi (`mr`) is the primary language across all pages, navigation, headers, forms, and dialogs.
-- **Tri-State Switcher**: Instant switching between **मराठी**, **हिन्दी**, and **English**.
-- **Voice Assistant**: Slide-over drawer with 5 explicit lifecycle states (`IDLE`, `LISTENING`, `PROCESSING`, `SPEAKING`, `ERROR`) and authentic Marathi speech recognition and audio replay.
+
+- **Default Language**: Marathi (`mr`) is the primary language across all pages and advisories.
+- **Tri-State Switcher**: Instant live switching between **मराठी**, **हिन्दी**, and **English**.
+- **Voice Assistant**: Slide-over drawer with 5 lifecycle states (`IDLE`, `LISTENING`, `PROCESSING`, `SPEAKING`, `ERROR`) and authentic Marathi speech recognition.
+
+---
+
+## 📄 License & Academic Submission
+
+This project is submitted for the B.Tech DevOps Engineering Curriculum.  
+Author: **Shiven Rajput**  
+Repository: [kisan-iq-devops](https://github.com/Shiven-rajput-007/kisan-iq-devops)

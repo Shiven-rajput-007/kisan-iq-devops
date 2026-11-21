@@ -1,0 +1,107 @@
+services:
+  # ==============================================================================
+  # 1. Database Service: PostgreSQL 16
+  # ==============================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: kisaniq-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kisaniq_db}
+      POSTGRES_USER: ${POSTGRES_USER:-kisaniq_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kisaniq_secure_pass_2026}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - kisaniq_pgdata:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kisaniq_user} -d ${POSTGRES_DB:-kisaniq_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kisaniq-network
+
+  # ==============================================================================
+  # 2. Backend API Service: Node.js + Express + TypeScript
+  # ==============================================================================
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: ghcr.io/shiven-rajput-007/kisaniq-backend:latest
+    container_name: kisaniq-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kisaniq_user}:${POSTGRES_PASSWORD:-kisaniq_secure_pass_2026}@db:5432/${POSTGRES_DB:-kisaniq_db}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-kisaniq-super-secret-production-key-2026}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80,http://localhost,http://127.0.0.1:5173}
+      CEDA_API_KEY: ${CEDA_API_KEY:-}
+      CEDA_BASE_URL: ${CEDA_BASE_URL:-https://api.ceda.ashoka.edu.in/v1}
+      MANDI_SYNC_SECRET: ${MANDI_SYNC_SECRET:-kisaniq_mandi_sync_secret_token_2026}
+      OPEN_METEO_BASE_URL: ${OPEN_METEO_BASE_URL:-https://api.open-meteo.com}
+      ALLOW_DEV_SEED: ${ALLOW_DEV_SEED:-true}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - kisaniq-network
+
+  # ==============================================================================
+  # 3. Frontend Service: React 19 + Vite + Tailwind CSS (via Nginx Reverse Proxy)
+  # ==============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_API_BASE_URL: /api
+    image: ghcr.io/shiven-rajput-007/kisaniq-frontend:latest
+    container_name: kisaniq-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - kisaniq-network
+
+# ==============================================================================
+# Persistent Volumes Specification
+# ==============================================================================
+volumes:
+  kisaniq_pgdata:
+    name: kisaniq_pgdata
+    driver: local
+
+# ==============================================================================
+# Isolated Bridge Network Specification
+# ==============================================================================
+networks:
+  kisaniq-network:
+    name: kisaniq-network
+    driver: bridge

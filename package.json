@@ -11,7 +11,10 @@
     "build": "npm run build --prefix server && npm run build --prefix frontend",
     "seed": "npm run seed --prefix server",
     "db:seed": "npm run seed --prefix server",
-    "test": "npx tsx --prefix server test-suite.ts"
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm run test:mandi --prefix server",
+    "test:frontend": "npm run test:i18n --prefix frontend",
+    "test:e2e": "npx tsx --prefix server test-suite.ts"
   },
   "dependencies": {
     "puppeteer-core": "^25.10.0"

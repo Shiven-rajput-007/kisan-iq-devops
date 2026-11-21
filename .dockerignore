@@ -1,0 +1,46 @@
+# Git and IDE
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node dependencies and build artifacts
+node_modules
+server/node_modules
+frontend/node_modules
+dist
+server/dist
+frontend/dist
+
+# Database data
+server/db/data
+**/db/data/**
+*.sqlite
+*.sqlite-journal
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Documents and unrelated files
+medical-diagnosis-assistant/
+html-form-jenkins/
+KisanIQ-project/
+report_assets/
+report_generator/
+*.docx
+*.pdf
+*.xlsx
+*.zip
+*.html
+*.tex
+__pycache__/
+*.py
