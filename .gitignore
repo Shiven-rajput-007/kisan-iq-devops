@@ -57,6 +57,11 @@ Thumbs.db
 *.tex
 *.bak
 
+# Whitelist Official DevOps Report deliverables
+!KisanIQ_DevOps_Report/**
+!KisanIQ_DevOps_Report/*
+!KisanIQ_DevOps_Report/*.py
+
 # Unrelated Academic Paper Scripts & Workspace Utilities
 medical-diagnosis-assistant/
 html-form-jenkins/
@@ -78,5 +83,8 @@ test_*.py
 test_*.docx
 test.pdf
 chrome_test.pdf
+
+# Whitelist Official DevOps Report deliverables
+!KisanIQ_DevOps_Report/**
 docx_helpers.py
 CHATGPT_PROJECT_CONTEXT.md
