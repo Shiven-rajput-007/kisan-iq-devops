@@ -3,11 +3,15 @@ import { marketService } from '../services/marketService.js';
 import { dataGovAgmarknetProvider } from '../services/mandi/dataGovAgmarknetProvider.js';
 import { cedaAgmarknetProvider } from '../services/mandi/cedaAgmarknetProvider.js';
 import { db } from '../db/index.js';
+import { seedDatabase } from '../db/seed.js';
 
 async function runMandiTestSuite() {
   console.log('===========================================================');
   console.log('🌾 CEDA AGMARKNET MANDI SERVICE AUTOMATED TEST SUITE');
   console.log('===========================================================\n');
+
+  // Ensure database tables and initial test records exist
+  await seedDatabase();
 
   let passed = 0;
   let failed = 0;
